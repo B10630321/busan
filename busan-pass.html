@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>釜山 Pass 分配</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{ color-scheme:light; }
+  body{ font-family:"Noto Sans TC",system-ui,-apple-system,sans-serif; background:#f6f7fb; margin:0; }
+  select{ -webkit-appearance:none; appearance:none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function(){
+  "use strict";
+  var h=React.createElement;
+  var useState=React.useState, useEffect=React.useEffect, useMemo=React.useMemo;
+
+  var MASTER=[
+    {name:"Spa Land",g:"A"},{name:"X the Sky",g:"A"},{name:"Skyline Luge",g:"A"},{name:"釜山觀光巴士",g:"A"},{name:"樂天世界",g:"A"},
+    {name:"釜山塔",g:"B"},{name:"海雲台海岸列車",g:"B"},{name:"Arte Museum",g:"B"},{name:"松島海上纜車",g:"B"}
+  ];
+  var GROUP_OF=function(n){ var a=MASTER.find(function(x){return x.name===n;}); return a?a.g:null; };
+
+  var DEF_CARDS=[
+    {id:"c1",name:"Dooog Gao1",history:["釜山塔","海雲台海岸列車","Spa Land"]},
+    {id:"c2",name:"Dooog Gao2",history:["釜山塔","海雲台海岸列車","Spa Land"]},
+    {id:"c3",name:"Mo1",history:["釜山塔","海雲台海岸列車","松島海上纜車"]},
+    {id:"c4",name:"Mo2",history:["釜山塔","海雲台海岸列車","松島海上纜車"]},
+    {id:"c5",name:"Glenda Chen1",history:["釜山塔","海雲台海岸列車","松島海上纜車","Skyline Luge"]},
+    {id:"c6",name:"Glenda Chen2",history:["釜山塔","海雲台海岸列車","松島海上纜車","Skyline Luge"]},
+    {id:"c7",name:"klook1",history:[]},
+    {id:"c8",name:"klook2",history:[]},
+    {id:"c9",name:"Angela Lee1",history:["釜山塔","Arte Museum","釜山觀光巴士","樂天世界"]},
+    {id:"c10",name:"Angela Lee2",history:["釜山塔","Arte Museum","釜山觀光巴士","樂天世界"]},
+    {id:"c11",name:"實體卡",history:["釜山塔","海雲台海岸列車","松島海上纜車","樂天世界"]}
+  ];
+  var DEF_TARGETS=[
+    {id:"t1",name:"Spa Land",group:"A",need:3,slots:["c5","c6","c11"]},
+    {id:"t2",name:"Skyline Luge",group:"A",need:4,slots:["c1","c2","c3","c4"]},
+    {id:"t3",name:"釜山觀光巴士",group:"A",need:4,slots:["c7","c8","c3","c4"]},
+    {id:"t4",name:"Arte Museum",group:"B",need:4,slots:["c1","c2","c7","c8"]},
+    {id:"t5",name:"松島海上纜車",group:"B",need:4,slots:["c7","c8","c9","c10"]}
+  ];
+  var KEY="busan-pass-tool-v3";
+  var onClaude=/claude|usercontent/i.test(location.hostname);
+  function load(){ try{ var s=localStorage.getItem(KEY); if(s){ var o=JSON.parse(s); if(o&&o.cards&&o.targets) return o; } }catch(e){} return {cards:JSON.parse(JSON.stringify(DEF_CARDS)),targets:JSON.parse(JSON.stringify(DEF_TARGETS))}; }
+
+  function usage(cards,targets){
+    var m={};
+    cards.forEach(function(c){
+      var hp=0,hb=0; c.history.forEach(function(n){ var gg=GROUP_OF(n); if(gg==="A")hp++; else if(gg==="B")hb++; });
+      m[c.id]={histP:hp,histB:hb,asgP:0,asgB:0,at:[]};
+    });
+    targets.forEach(function(t){ t.slots.forEach(function(cid){ if(cid&&m[cid]){ if(t.group==="A")m[cid].asgP++; else m[cid].asgB++; m[cid].at.push(t.name); } }); });
+    Object.keys(m).forEach(function(k){ var u=m[k]; u.remP=2-u.histP-u.asgP; u.remB=3-u.histB-u.asgB; });
+    return m;
+  }
+  function canAssign(c,t,si,u){
+    if(t.slots[si]===c.id) return {ok:true};
+    if(c.history.indexOf(t.name)>=0) return {ok:false,why:"已去過"};
+    if(t.slots.indexOf(c.id)>=0) return {ok:false,why:"已在此景點"};
+    var rem=t.group==="A"?u[c.id].remP:u[c.id].remB;
+    if(rem<=0) return {ok:false,why:"額度不足"};
+    return {ok:true};
+  }
+
+  function Chip(props){ return h("span",{className:"inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold "+props.cls},props.children); }
+  function GroupTag(g){ return g==="A"
+    ? h(Chip,{cls:"bg-violet-100 text-violet-700 border border-violet-300"},"🟣 A組 紫")
+    : h(Chip,{cls:"bg-sky-100 text-sky-700 border border-sky-300"},"🔵 B組 藍"); }
+
+  function App(){
+    var init=load();
+    var cs=useState(init.cards), cards=cs[0], setCards=cs[1];
+    var ts=useState(init.targets), targets=ts[0], setTargets=ts[1];
+    useEffect(function(){ try{ localStorage.setItem(KEY,JSON.stringify({cards:cards,targets:targets})); }catch(e){} },[cards,targets]);
+
+    var u=useMemo(function(){ return usage(cards,targets); },[cards,targets]);
+
+    // totals
+    var totRemP=0,totRemB=0; cards.forEach(function(c){ totRemP+=Math.max(0,u[c.id].remP); totRemB+=Math.max(0,u[c.id].remB); });
+    var histRemP=0,histRemB=0; cards.forEach(function(c){ histRemP+=(2-u[c.id].histP); histRemB+=(3-u[c.id].histB); });
+    var demP=0,demB=0,fillP=0,fillB=0;
+    targets.forEach(function(t){ var f=t.slots.filter(function(x){return x;}).length; if(t.group==="A"){demP+=t.need;fillP+=f;} else {demB+=t.need;fillB+=f;} });
+
+    // ---- card form ----
+    var cf=useState({name:"",hist:{}}), cForm=cf[0], setCForm=cf[1];
+    function toggleHist(n){ setCForm(function(s){ var hh=Object.assign({},s.hist); hh[n]=!hh[n]; return {name:s.name,hist:hh}; }); }
+    function addCard(){
+      var nm=cForm.name.trim(); if(!nm) return;
+      var his=MASTER.filter(function(a){return cForm.hist[a.name];}).map(function(a){return a.name;});
+      setCards(function(cs){ return cs.concat([{id:"c"+Date.now(),name:nm,history:his}]); });
+      setCForm({name:"",hist:{}});
+    }
+    function delCard(id){
+      setCards(function(cs){ return cs.filter(function(c){return c.id!==id;}); });
+      setTargets(function(ts){ return ts.map(function(t){ return Object.assign({},t,{slots:t.slots.map(function(s){return s===id?null:s;})}); }); });
+    }
+
+    // ---- target form ----
+    var tf=useState({name:"",group:"A",need:4}), tForm=tf[0], setTForm=tf[1];
+    function addTarget(){
+      var nm=tForm.name.trim(); if(!nm) return;
+      var need=Math.max(1,Math.min(10,parseInt(tForm.need,10)||1));
+      var gg=GROUP_OF(nm)||tForm.group;
+      setTargets(function(ts){ return ts.concat([{id:"t"+Date.now(),name:nm,group:gg,need:need,slots:Array(need).fill(null)}]); });
+      setTForm({name:"",group:"A",need:4});
+    }
+    function delTarget(id){ setTargets(function(ts){ return ts.filter(function(t){return t.id!==id;}); }); }
+    function changeNeed(ti,delta){
+      setTargets(function(ts){ return ts.map(function(t,i){ if(i!==ti) return t; var n=Math.max(1,Math.min(12,t.need+delta)); var slots=t.slots.slice(0,n); while(slots.length<n) slots.push(null); return Object.assign({},t,{need:n,slots:slots}); }); });
+    }
+    function setSlot(ti,si,val){ setTargets(function(ts){ return ts.map(function(t,i){ if(i!==ti) return t; return Object.assign({},t,{slots:t.slots.map(function(s,j){return j===si?(val||null):s;})}); }); }); }
+
+    function resetAll(){ setCards(JSON.parse(JSON.stringify(DEF_CARDS))); setTargets(JSON.parse(JSON.stringify(DEF_TARGETS))); }
+
+    // ===== render =====
+    var header=h("div",{className:"mb-5"},
+      h("a",{href:(onClaude?"https://claude.ai/artifact/QNn85PzEo1JY7j2VEEeNL3":"index.html"),target:"_blank",rel:"noopener",className:"inline-flex items-center gap-1 text-sm text-indigo-600 font-semibold mb-2 hover:underline"},"← 回行程手冊 Bu想要san班"),
+      h("h1",{className:"text-2xl font-black text-slate-800 flex items-center gap-2"},"🎟️ 釜山通行證 BIG5 分配"),
+      h("p",{className:"text-sm text-slate-500 mt-1"},"每張卡：2 個 A組(紫) + 3 個 B組(藍)。同一張卡不可重複去同一景點。")
+    );
+
+    var summary=h("div",{className:"grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6"},
+      statBox("剩餘紫點", totRemP, "violet", "需求 "+demP+" · 已配 "+fillP),
+      statBox("剩餘藍點", totRemB, "sky", "需求 "+demB+" · 已配 "+fillB),
+      feaBox("紫色總量", demP, histRemP, "violet"),
+      feaBox("藍色總量", demB, histRemB, "sky")
+    );
+
+    function statBox(label,val,color,sub){
+      var c={violet:"from-violet-500 to-violet-600",sky:"from-sky-500 to-sky-600"}[color];
+      return h("div",{className:"rounded-2xl p-3 text-white bg-gradient-to-br "+c+" shadow"},
+        h("div",{className:"text-xs opacity-90"},label),
+        h("div",{className:"text-3xl font-black leading-tight"},val),
+        h("div",{className:"text-[11px] opacity-90 mt-0.5"},sub)
+      );
+    }
+    function feaBox(label,dem,avail,color){
+      var ok=dem<=avail; var ring=ok?"border-emerald-300 bg-emerald-50 text-emerald-700":"border-rose-300 bg-rose-50 text-rose-700";
+      return h("div",{className:"rounded-2xl p-3 border-2 "+ring+" shadow-sm flex flex-col justify-center"},
+        h("div",{className:"text-xs font-semibold"},label),
+        h("div",{className:"text-lg font-black mt-0.5"}, ok?"✓ 足夠":"✕ 不足"),
+        h("div",{className:"text-[11px] mt-0.5"},"需求 "+dem+" / 可用 "+avail)
+      );
+    }
+
+    // Card Manager
+    var cardManager=h("section",{className:"bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-5"},
+      h("h2",{className:"font-bold text-slate-800 mb-3 flex items-center gap-2"},"🗂️ 卡片庫"),
+      h("div",{className:"rounded-xl bg-slate-50 border border-slate-200 p-3 mb-4"},
+        h("input",{className:"w-full rounded-lg border border-slate-300 px-3 py-2 text-sm mb-2", placeholder:"卡片名稱（如：新卡11）", value:cForm.name, onChange:function(e){ var v=e.target.value; setCForm(function(s){return Object.assign({},s,{name:v});}); }}),
+        h("div",{className:"text-xs text-slate-500 mb-1"},"已去過的景點（會自動扣額度）："),
+        h("div",{className:"flex flex-wrap gap-1.5"}, MASTER.map(function(a){
+          var on=!!cForm.hist[a.name];
+          var base="text-xs px-2.5 py-1 rounded-full border cursor-pointer select-none ";
+          var col=a.g==="A"?(on?"bg-violet-500 text-white border-violet-500":"bg-white text-violet-700 border-violet-300"):(on?"bg-sky-500 text-white border-sky-500":"bg-white text-sky-700 border-sky-300");
+          return h("span",{key:a.name,className:base+col,onClick:function(){toggleHist(a.name);}}, (a.g==="A"?"🟣":"🔵")+" "+a.name);
+        })),
+        h("button",{className:"mt-3 w-full bg-slate-800 text-white rounded-lg py-2 text-sm font-bold hover:bg-slate-700",onClick:addCard},"＋ 新增卡片")
+      ),
+      h("div",{className:"space-y-2"}, cards.map(function(c){
+        var uu=u[c.id];
+        var overP=uu.remP<0, overB=uu.remB<0;
+        return h("div",{key:c.id,className:"rounded-xl border border-slate-200 p-3"},
+          h("div",{className:"flex items-center justify-between gap-2"},
+            h("div",{className:"font-bold text-slate-800 text-sm"},c.name),
+            h("div",{className:"flex items-center gap-1.5"},
+              h("span",{className:"text-xs font-bold px-2 py-0.5 rounded-full "+(overP?"bg-rose-100 text-rose-700":"bg-violet-100 text-violet-700")},"紫 "+uu.remP),
+              h("span",{className:"text-xs font-bold px-2 py-0.5 rounded-full "+(overB?"bg-rose-100 text-rose-700":"bg-sky-100 text-sky-700")},"藍 "+uu.remB),
+              h("button",{className:"text-slate-400 hover:text-rose-500 text-sm px-1",title:"刪除",onClick:function(){delCard(c.id);}},"✕")
+            )
+          ),
+          c.history.length?h("div",{className:"text-[11px] text-slate-400 mt-1"},"歷史："+c.history.join("、")):h("div",{className:"text-[11px] text-emerald-500 mt-1"},"全新未使用"),
+          uu.at.length?h("div",{className:"text-[11px] text-indigo-500 mt-0.5"},"本次指派："+uu.at.join("、")):null
+        );
+      }))
+    );
+
+    // Attraction Manager
+    var attrManager=h("section",{className:"bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-5"},
+      h("h2",{className:"font-bold text-slate-800 mb-3 flex items-center gap-2"},"📍 目標景點"),
+      h("div",{className:"rounded-xl bg-slate-50 border border-slate-200 p-3"},
+        h("input",{className:"w-full rounded-lg border border-slate-300 px-3 py-2 text-sm mb-2", placeholder:"景點名稱", list:"attrlist", value:tForm.name, onChange:function(e){ var v=e.target.value; var gg=GROUP_OF(v); setTForm(function(s){return Object.assign({},s,{name:v,group:gg||s.group});}); }}),
+        h("datalist",{id:"attrlist"}, MASTER.map(function(a){return h("option",{key:a.name,value:a.name});})),
+        h("div",{className:"flex items-center gap-3 mb-2"},
+          h("label",{className:"text-sm flex items-center gap-1 cursor-pointer"}, h("input",{type:"radio",name:"grp",checked:tForm.group==="A",onChange:function(){setTForm(function(s){return Object.assign({},s,{group:"A"});});}}),"🟣 A紫"),
+          h("label",{className:"text-sm flex items-center gap-1 cursor-pointer"}, h("input",{type:"radio",name:"grp",checked:tForm.group==="B",onChange:function(){setTForm(function(s){return Object.assign({},s,{group:"B"});});}}),"🔵 B藍"),
+          h("span",{className:"text-sm text-slate-500 ml-auto"},"幾張卡"),
+          h("input",{type:"number",min:1,max:10,className:"w-16 rounded-lg border border-slate-300 px-2 py-1 text-sm",value:tForm.need,onChange:function(e){ var v=e.target.value; setTForm(function(s){return Object.assign({},s,{need:v});}); }})
+        ),
+        h("button",{className:"w-full bg-slate-800 text-white rounded-lg py-2 text-sm font-bold hover:bg-slate-700",onClick:addTarget},"＋ 新增景點")
+      )
+    );
+
+    // Dashboard
+    var dashboard=h("section",{className:"bg-white rounded-2xl border border-slate-200 shadow-sm p-4"},
+      h("h2",{className:"font-bold text-slate-800 mb-3 flex items-center gap-2"},"🎯 分配控制台"),
+      targets.length?null:h("div",{className:"text-sm text-slate-400 py-6 text-center"},"尚無景點，請先在上方「目標景點」新增。"),
+      h("div",{className:"space-y-4"}, targets.map(function(t,ti){
+        var filled=t.slots.filter(function(x){return x;}).length;
+        var done=filled>=t.need;
+        return h("div",{key:t.id,className:"rounded-xl border-2 "+(done?"border-emerald-200":"border-slate-200")+" p-3"},
+          h("div",{className:"flex items-center justify-between gap-2 mb-2"},
+            h("div",{className:"flex items-center gap-2 flex-wrap"},
+              h("span",{className:"font-bold text-slate-800"},t.name), GroupTag(t.group),
+              h("span",{className:"text-xs "+(done?"text-emerald-600":"text-slate-400")+" font-semibold"},filled+" / "+t.need+(done?" ✓":""))
+            ),
+            h("div",{className:"flex items-center gap-1"},
+              h("button",{className:"w-7 h-7 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100",onClick:function(){changeNeed(ti,-1);}},"−"),
+              h("button",{className:"w-7 h-7 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100",onClick:function(){changeNeed(ti,1);}},"＋"),
+              h("button",{className:"w-7 h-7 rounded-lg text-slate-400 hover:text-rose-500",title:"刪除景點",onClick:function(){delTarget(t.id);}},"✕")
+            )
+          ),
+          h("div",{className:"grid grid-cols-1 sm:grid-cols-2 gap-2"}, t.slots.map(function(cid,si){
+            var opts=[h("option",{key:"_",value:""},"— 未指派 —")].concat(cards.map(function(c){
+              var r=canAssign(c,t,si,u);
+              var rem=t.group==="A"?u[c.id].remP:u[c.id].remB;
+              var lab=c.name+"（紫"+u[c.id].remP+"/藍"+u[c.id].remB+"）"+(r.ok?"":" ✕"+r.why);
+              return h("option",{key:c.id,value:c.id,disabled:!r.ok},lab);
+            }));
+            var picked=!!cid;
+            return h("div",{key:si,className:"relative"},
+              h("select",{
+                className:"w-full rounded-lg border px-3 py-2 text-sm "+(picked?"border-indigo-300 bg-indigo-50 text-indigo-800 font-semibold":"border-slate-300 bg-white text-slate-500"),
+                value:cid||"", onChange:function(e){ setSlot(ti,si,e.target.value); }
+              }, opts),
+              h("span",{className:"pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"},"▼")
+            );
+          }))
+        );
+      }))
+    );
+
+    var toolbar=h("div",{className:"flex items-center justify-between gap-2 mb-5"},
+      h("div",{className:"text-xs text-slate-400"},"資料自動儲存在本機"),
+      h("button",{className:"text-xs border border-slate-300 rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-100",onClick:resetAll},"↺ 重設為預設")
+    );
+
+    return h("div",{className:"max-w-3xl mx-auto px-4 py-6"},
+      header, summary, toolbar,
+      h("div",{className:"grid md:grid-cols-2 gap-5 items-start"}, cardManager, attrManager),
+      dashboard,
+      h("div",{className:"text-center text-xs text-slate-300 mt-8"},"🎟️ Bu想要san班 · Pass 分配工具")
+    );
+  }
+  function histHelperP(cards,u){ var s=0; cards.forEach(function(c){ s+=Math.max(0,u[c.id].remP); }); return s; }
+  function histHelperB(cards,u){ var s=0; cards.forEach(function(c){ s+=Math.max(0,u[c.id].remB); }); return s; }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+})();
+</script>
+</body>
+</html>
