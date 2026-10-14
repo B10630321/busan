@@ -43,13 +43,13 @@
     {id:"c11",name:"實體卡",history:["釜山塔","海雲台海岸列車","松島海上纜車","樂天世界"]}
   ];
   var DEF_TARGETS=[
-    {id:"t1",name:"Spa Land",group:"A",need:3,slots:["c5","c6","c11"]},
-    {id:"t2",name:"Skyline Luge",group:"A",need:4,slots:["c1","c2","c3","c4"]},
-    {id:"t3",name:"釜山觀光巴士",group:"A",need:4,slots:["c7","c8","c3","c4"]},
-    {id:"t4",name:"Arte Museum",group:"B",need:4,slots:["c1","c2","c7","c8"]},
-    {id:"t5",name:"松島海上纜車",group:"B",need:4,slots:["c7","c8","c9","c10"]}
+    {id:"t1",name:"Spa Land",group:"A",need:4,slots:["c3","c4","c7","c8"]},
+    {id:"t2",name:"Skyline Luge",group:"A",need:5,slots:["c3","c4","c7","c8",null]},
+    {id:"t3",name:"釜山觀光巴士",group:"A",need:5,slots:["c1","c2","c5","c6","c11"]},
+    {id:"t4",name:"Arte Museum",group:"B",need:5,slots:["c1","c2","c7","c8",null]},
+    {id:"t5",name:"松島海上纜車",group:"B",need:5,slots:["c7","c8","c9","c10",null]}
   ];
-  var KEY="busan-pass-tool-v3";
+  var KEY="busan-pass-tool-v5";
   var onClaude=/claude|usercontent/i.test(location.hostname);
   function load(){ try{ var s=localStorage.getItem(KEY); if(s){ var o=JSON.parse(s); if(o&&o.cards&&o.targets) return o; } }catch(e){} return {cards:JSON.parse(JSON.stringify(DEF_CARDS)),targets:JSON.parse(JSON.stringify(DEF_TARGETS))}; }
 
@@ -124,7 +124,7 @@
 
     // ===== render =====
     var header=h("div",{className:"mb-5"},
-      h("a",{href:(onClaude?"https://claude.ai/artifact/QNn85PzEo1JY7j2VEEeNL3":"index.html"),target:"_blank",rel:"noopener",className:"inline-flex items-center gap-1 text-sm text-indigo-600 font-semibold mb-2 hover:underline"},"← 回行程手冊 Bu想要san班"),
+      h("a",{href:(onClaude?"https://claude.ai/artifact/QNn85PzEo1JY7j2VEEeNL3":"index.html"),target:"_blank",rel:"noopener",className:"inline-flex items-center gap-1 text-sm text-indigo-600 font-semibold mb-2 hover:underline"},"← 回行程手冊 Bu想去san班"),
       h("h1",{className:"text-2xl font-black text-slate-800 flex items-center gap-2"},"🎟️ 釜山通行證 BIG5 分配"),
       h("p",{className:"text-sm text-slate-500 mt-1"},"每張卡：2 個 A組(紫) + 3 個 B組(藍)。同一張卡不可重複去同一景點。")
     );
@@ -249,7 +249,7 @@
       header, summary, toolbar,
       h("div",{className:"grid md:grid-cols-2 gap-5 items-start"}, cardManager, attrManager),
       dashboard,
-      h("div",{className:"text-center text-xs text-slate-300 mt-8"},"🎟️ Bu想要san班 · Pass 分配工具")
+      h("div",{className:"text-center text-xs text-slate-300 mt-8"},"🎟️ Bu想去san班 · Pass 分配工具")
     );
   }
   function histHelperP(cards,u){ var s=0; cards.forEach(function(c){ s+=Math.max(0,u[c.id].remP); }); return s; }
